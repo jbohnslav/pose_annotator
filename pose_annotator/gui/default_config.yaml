@@ -1,0 +1,6 @@
+keypoints:
+  - one
+  - two
+  - three
+colormap: viridis
+radius: 5
