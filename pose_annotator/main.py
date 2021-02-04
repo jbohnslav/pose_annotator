@@ -1,9 +1,12 @@
+from collections import OrderedDict
 from copy import deepcopy
 from functools import partial
 import os
 import sys
 
+import numpy as np
 from omegaconf import OmegaConf, DictConfig
+import pandas as pd
 from PySide2 import QtCore, QtWidgets, QtGui
 
 from pose_annotator.gui.mainwindow import Ui_MainWindow
@@ -27,7 +30,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.player.videoView.initialize_video('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526')
         
         keys = OmegaConf.to_container(cfg.keypoints)
-        self.keypoint_dict = {key: [] for key in keys}
+        self.keypoint_dict = OrderedDict({key: [] for key in keys})
+        # self.keypoint_dict = {key: [] for key in keys}
         self.keypoints = None
         
         self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, 
@@ -58,14 +62,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.actionOpen_image_directory.triggered.connect(self.open_image_directory)
         self.ui.actionOpen_video.triggered.connect(self.open_video)
         
+        # hotkeys
+        save_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+S'), self)
+        save_shortcut.activated.connect(self.save)
+        nextframe_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Right'), self)
+        nextframe_shortcut.activated.connect(self.player.videoView.next_frame)
+        prevframe_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Left'), self)
+        prevframe_shortcut.activated.connect(self.player.videoView.previous_frame)
+        down_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Down'), self)
+        down_shortcut.activated.connect(self.keypoints.increment_selected)
+        space_shorcut = QtWidgets.QShortcut(QtGui.QKeySequence('Space'), self)
+        space_shorcut.activated.connect(self.keypoints.increment_selected)
+        up_shorcut = QtWidgets.QShortcut(QtGui.QKeySequence('Up'), self)
+        up_shorcut.activated.connect(self.keypoints.decrement_selected)
         
         self.data = []
         self.saved = True
         self.framenum = 0
-        
+        self.save_loc = None
+        # self.initialize_save_loc()
+        self.save_filename = None
         self.initialize_new_file('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526', 'video')
         
         self.show()
+        
+    def get_save_loc(self):
+        saveloc = self.cfg.save_loc
+        if saveloc is not None:
+            assert os.path.isdir(saveloc)
+        return saveloc
         
     def open_file_browser(self, filestring, prompt, filetype):
         options = QtWidgets.QFileDialog.Options()
@@ -122,7 +147,14 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             raise ValueError('unknown file type: {}'.format(filetype))
         
+        save_loc = self.get_save_loc()
+        if save_loc is None:
+            save_loc = os.path.dirname(filename)
+        
+        self.save_filename = os.path.join(save_loc, 
+                                          os.path.splitext(os.path.basename(filename))[0] + '_keypoints.csv')
         self.data = [deepcopy(self.keypoint_dict) for i in range(N)]
+        
         
     def initialize_keypoint_group(self, keypoints: dict):
         self.clear_keypoints()
@@ -133,17 +165,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def clear_keypoints(self):
         if self.keypoints is not None:
-            print('clearing')
+            # print('clearing')
             self.keypoints.clear_data()
-        else:
-            print('not clearing')
+        # else:
+        #     print('not clearing')
     
     @QtCore.Slot(dict)
     def update_data_buffer(self, data):
         # without copying, could have an issue where the underlying keypoint gui state changes. we want to only 
         # keep the real data
         self.data[self.framenum] = deepcopy(data)
-        print(self.data)
+        self.saved = False
+        # print(self.data)
         # print(data)
         # print(self.keypoint_dict)
             
@@ -154,11 +187,48 @@ class MainWindow(QtWidgets.QMainWindow):
             self.framenum = framenum
             keypoints = self.data[framenum]
             self.initialize_keypoint_group(keypoints)
-            self.keypoint_selector.set_selected(0)
+            
+            # radio button will be set to the first keypoint that hasn't been placed on this frame
+            first_nonzero = len(keypoints) - 1
+            for i, (key, value) in enumerate(keypoints.items()):
+                if len(value) == 0 or np.sum(np.isnan(value)) > 0 or value is None:
+                    if i < first_nonzero:
+                        first_nonzero = i
+                        break
+
+            self.keypoint_selector.set_selected(first_nonzero)
+    
     
     def save(self):
-        pass
+        has_any_data = []
+        for element in self.data:
+            frame_has_data = False
+            for key, value in element.items():
+                if len(value) > 0:
+                    frame_has_data = True
+                    break
+            has_any_data.append(frame_has_data)
         
+        data = {}
+        for i, element in enumerate(self.data):
+            row = {}
+            if not has_any_data[i]:
+                continue
+            for key, value in element.items():
+                if value is None:
+                    value = [np.nan, np.nan]
+                row[key + '_x'] = value[0]
+                row[key + '_y'] = value[1]
+            data[i] = row
+            
+        df = pd.DataFrame(data)
+        # switch rows and columns
+        df = df.T
+        
+        df.to_csv(self.save_filename)
+        print('saving to {}'.format(self.save_filename))
+        return df
+            
     def prompt_for_save(self):
         if self.saved:
             return

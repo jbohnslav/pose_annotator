@@ -154,6 +154,12 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # print('new fnum: {}'.format(self.current_fnum))
         self.show_image(self.frame)
         self.frameNum.emit(self.current_fnum)
+        
+    def next_frame(self):
+        self.update_frame(self.current_fnum + 1)
+
+    def previous_frame(self):
+        self.update_frame(self.current_fnum - 1)
 
     def fitInView(self, scale=True):
         rect = QtCore.QRectF(self._photo.pixmap().rect())
@@ -368,6 +374,8 @@ class Keypoint(QtWidgets.QGraphicsEllipseItem):
         self.setPen(self.pen)
         
     def set_coords(self, cx, cy, r):
+        if cx != cx or cy != cy:
+            return
         self.cx = cx
         self.cy = cy
         self.radius = r
@@ -387,6 +395,8 @@ class Keypoint(QtWidgets.QGraphicsEllipseItem):
         # self.cy = 100
         # self.radius = 20
         # self.draw(self.cx, self.cy, self.radius)
+        self.cx = None
+        self.cy = None
         self.setVisible(False)
     
 
@@ -455,9 +465,16 @@ class KeypointGroup(QtWidgets.QWidget):
         for i, key in enumerate(self.keys):
             self.keypoints[key].clear()
         # self.broadcast_data()
+        
+    def increment_selected(self):
+        self.set_selected(self.index + 1)
+        
+    def decrement_selected(self):
+        self.set_selected(self.index - 1)
             
     @Slot(int)
     def set_selected(self, index: int):
+        # print(index)
         if index < 0:
             warnings.warn('index below zero, bug somewhere')
             return
@@ -482,7 +499,7 @@ class KeypointGroup(QtWidgets.QWidget):
         self.keypoints[key].set_coords(x,y, self.radius)
         self.broadcast_data()
         
-        print(x,y)
+        # print(x,y)
         self.set_selected(self.index+1)
         
     def left_click(self, event):
@@ -499,9 +516,9 @@ class KeypointGroup(QtWidgets.QWidget):
         if min_dist < keypoint.radius and keypoint.isVisible():
             self.tmp_selected = min_ind
             # self.set_selected(min_ind)
-            print('inside')    
-        else:
-            print('not close')
+            # print('inside')    
+        # else:
+        #     print('not close')
     
     def get_keypoint_coords(self):
         coords = []
@@ -510,7 +527,7 @@ class KeypointGroup(QtWidgets.QWidget):
             if x is None or y is None:
                 x, y = np.nan, np.nan
             coords.append([x,y])
-        coords = np.array(coords)
+        coords = np.array(coords).astype(np.float32)
         return coords
     
     def get_distance_to_keypoints(self, x, y):
@@ -588,7 +605,7 @@ class KeypointButtons(QtWidgets.QWidget):
         
         color = self.colors[index]
         color_string = f'rgb({color[0]},{color[1]},{color[2]})'
-        print(color_string)
+        # print(color_string)
         button.setStyleSheet('color: {}'.format(color_string))
         self.buttons.append(button)
         self.layout.addWidget(button)
