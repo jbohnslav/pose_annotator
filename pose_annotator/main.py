@@ -75,6 +75,8 @@ class MainWindow(QtWidgets.QMainWindow):
         space_shorcut.activated.connect(self.keypoints.increment_selected)
         up_shorcut = QtWidgets.QShortcut(QtGui.QKeySequence('Up'), self)
         up_shorcut.activated.connect(self.keypoints.decrement_selected)
+        delete_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Delete'), self)
+        delete_shortcut.activated.connect(self.keypoints.clear_selected)
         
         self.data = []
         self.saved = True

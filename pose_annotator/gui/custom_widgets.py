@@ -471,6 +471,9 @@ class KeypointGroup(QtWidgets.QWidget):
         
     def decrement_selected(self):
         self.set_selected(self.index - 1)
+        
+    def clear_selected(self):
+        self.get_keypoint(self.index).clear()
             
     @Slot(int)
     def set_selected(self, index: int):
