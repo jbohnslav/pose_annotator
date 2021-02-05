@@ -39,9 +39,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.keypoints = None
         
         self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, 
-                                       parent=self.player, colormap=self.cfg.colormap, radius=self.cfg.radius)
+                                       parent=self.player, colormap=self.cfg.viz.colormap, radius=self.cfg.viz.radius)
         
-        self.keypoint_selector = KeypointButtons(keys, colormap=cfg.colormap, parent=self)
+        self.keypoint_selector = KeypointButtons(keys, colormap=cfg.viz.colormap, parent=self)
         self.ui.verticalLayout_2.addWidget(self.keypoint_selector)
         
         # should do this somewhere else
@@ -181,7 +181,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.clear_keypoints()
         self.keypoints.set_data(keypoints)
         # self.keypoints = KeypointGroup(keypoints, self.player.videoView.scene, 
-        #                                parent=self.player, colormap=self.cfg.colormap, radius=self.cfg.radius)
+        #                                parent=self.player, colormap=self.cfg.viz.colormap, radius=self.cfg.radius)
         
 
     def clear_keypoints(self):
@@ -267,6 +267,14 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if simple_popup_question(self, 'You have unsaved changes. Do you want to save?'):
             self.save()
+            
+    def closeEvent(self, event, *args, **kwargs):
+        super().closeEvent(event, *args, **kwargs)
+        # https://stackoverflow.com/questions/1414781/prompt-on-exit-in-pyqt-application
+        self.prompt_for_save()
+
+        if hasattr(self.player.videoView, 'vid'):
+            self.player.videoView.vid.close()
         
         
             
@@ -302,8 +310,15 @@ def run():
     default_path = os.path.join(os.path.dirname(__file__), 'default_config.yaml')
     
     default = OmegaConf.load(default_path)
+    
     cli = OmegaConf.from_cli()
-    cfg = OmegaConf.merge(default, cli)
+    if cli.user_cfg is not None:
+        assert os.path.isfile(cli.user_cfg)
+        user_cfg = OmegaConf.load(cli.user_cfg)
+        cfg = OmegaConf.merge(default, user_cfg, cli)
+    else:
+        cfg = OmegaConf.merge(default, cli)
+    
     OmegaConf.set_struct(cfg, True)
 
     window = MainWindow(cfg)

@@ -92,7 +92,7 @@ class VideoFrame(QtWidgets.QGraphicsView):
             self.initialize_video(videoFile)
             self.update()
         self.setStyleSheet("background:transparent;")
-        
+        self.setMouseTracking(True)    
     
     def initialize_image(self, imagefile: Union[str, os.PathLike])    : 
         self.videofile = imagefile
@@ -405,10 +405,9 @@ class KeypointGroup(QtWidgets.QWidget):
     selected = Signal(int)
     data = Signal(dict)
     
-    def __init__(self, keypoint_dict, scene, parent=None, colormap:str='viridis', radius=20):
+    def __init__(self, keypoint_dict, scene, parent=None, colormap:str='viridis', radius=20, 
+                 text_over_mouse=True):
         super().__init__(parent)
-        
-        print('constructor')
         
         self.cmap = plt.get_cmap(colormap)
         
@@ -425,12 +424,14 @@ class KeypointGroup(QtWidgets.QWidget):
         self.radius = radius
         self.add_to_scene(scene)
         self.index = 0
+        self.key = None
         self.selected.emit(self.index)
         self.scene = scene
         self.tmp_selected = None
-        
+        self.text_over_mouse = text_over_mouse
         self.set_data(keypoint_dict)
-        
+        self.text = None
+        self.update_text()
         # self.data = {}
         # self.scene.viewport().installEventFilter(self)
             
@@ -451,12 +452,12 @@ class KeypointGroup(QtWidgets.QWidget):
                 self.keypoints[key].set_coords(*value)
             
     def add_to_scene(self, scene):
-        print('add to scene')
+        # print('add to scene')
         for key, value in self.keypoints.items():
             scene.addItem(value)
             
     def remove_from_scene(self):
-        print('remove from scene')
+        # print('remove from scene')
         for key, value in self.keypoints.items():
             self.scene.removeItem(value)
             
@@ -491,7 +492,25 @@ class KeypointGroup(QtWidgets.QWidget):
             # don't do anything. should make sure that there isn't a loop between various widgets that control this
             return
         self.index = index
+        self.update_text()
         self.selected.emit(self.index)
+    
+    def update_text(self):
+        self.key = self.keys[self.index]
+        if not self.text_over_mouse:
+            return
+        color = self.colors[self.index]
+        line_color = QColor(color[0], color[1], color[2], color[3])
+        face_color = QColor(color[0], color[1], color[2], int(color[3]*0.3))
+        pen = QPen(line_color, 0.5, Qt.SolidLine, Qt.FlatCap, Qt.MiterJoin)
+        brush = QBrush(face_color)
+        if self.text is None:
+            self.text = QtWidgets.QGraphicsSimpleTextItem(self.key)
+            self.scene.addItem(self.text)
+
+        self.text.setText(self.key)
+        self.text.setBrush(brush)
+        self.text.setPen(pen)
     
     def right_click(self, event):
         pos = event.scenePos()
@@ -547,16 +566,22 @@ class KeypointGroup(QtWidgets.QWidget):
     
     @Slot(QtGui.QMouseEvent)
     def receive_move(self, event):
+        pos = event.scenePos()
+        x, y = pos.x(), pos.y()
+        # print(x,y)
         # print(event.buttons())
         if event.buttons() == QtCore.Qt.LeftButton:
             # print(self.tmp_selected)
             if self.tmp_selected is None:
                 return
-            pos = event.scenePos()
-            x, y = pos.x(), pos.y()
+            
             
             self.keypoints[self.keys[self.tmp_selected]].set_coords(x, y, self.radius)
             self.broadcast_data()
+        if self.text_over_mouse:
+            if self.text is not None:
+                # print(x, y)
+                self.text.setPos(x + 10, y + 10)
             # print(event.scenePos())
     
     @Slot(QtGui.QMouseEvent)

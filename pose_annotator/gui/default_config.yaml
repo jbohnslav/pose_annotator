@@ -2,7 +2,10 @@ keypoints:
   - one
   - two
   - three
-colormap: viridis
-radius: 5
+viz:
+  colormap: viridis
+  radius: 5
+  text_over_mouse: True
 save_loc: null
 path: null
+user_cfg: null
