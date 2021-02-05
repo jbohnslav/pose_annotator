@@ -249,6 +249,7 @@ class MainWindow(QtWidgets.QMainWindow):
         df = utils.convert_data_to_df(self.data)
         df.to_csv(self.save_filename)
         print('saving to {}'.format(self.save_filename))
+        self.saved = True
         return df
     
     def load(self, filename):
