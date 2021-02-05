@@ -17,9 +17,12 @@ def check_for_any_data(data: list) -> list:
 def convert_data_to_df(data: list) -> pd.DataFrame:
     has_any_data = check_for_any_data(data)
     
-    rows = {}
+    # rows = {}
+    indices = []
+    rows = []
+    keys = []
     for i, element in enumerate(data):
-        row = {}
+        row = OrderedDict()
         if not has_any_data[i]:
             continue
         for key, value in element.items():
@@ -31,11 +34,16 @@ def convert_data_to_df(data: list) -> pd.DataFrame:
             row[key + '_x'] = value[0]
             row[key + '_y'] = value[1]
             row[key + '_p'] = p
-        rows[i] = row
-    df = pd.DataFrame(rows)
+            if i == 0:
+                keys.append(key + '_x')
+                keys.append(key + '_y')
+                keys.append(key + '_p')
+        rows.append(row)
+        indices.append(i)
+    df = pd.DataFrame( data=rows, columns=keys, index=indices)
     # switch rows and columns
-    df = df.T
-    
+    # df = df.T
+
     return df
 
 def convert_row_to_dict(row) -> dict:
@@ -51,7 +59,8 @@ def convert_row_to_dict(row) -> dict:
             x = np.nan
             y = np.nan
             p = 0
-        key = keys[i].split('_')[0]
+        # chop off the _x, _y, or _p at the end
+        key = keys[i][:-2]
         # don't do anything with p for now
         data[key] = np.array([x, y]).astype(np.float32)
     return data
