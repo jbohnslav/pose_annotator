@@ -11,6 +11,10 @@ from PySide2 import QtCore, QtWidgets, QtGui
 
 from pose_annotator.gui.mainwindow import Ui_MainWindow
 from pose_annotator.gui.custom_widgets import KeypointGroup, KeypointButtons, simple_popup_question
+from pose_annotator import utils
+
+image_endings = ['.png', '.jpg', '.tiff', '.tif', '.bmp']
+video_endings = ['.mov', '.mp4', '.avi']
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -77,6 +81,8 @@ class MainWindow(QtWidgets.QMainWindow):
         up_shorcut.activated.connect(self.keypoints.decrement_selected)
         delete_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Delete'), self)
         delete_shortcut.activated.connect(self.keypoints.clear_selected)
+        backspace_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Backspace'), self)
+        backspace_shortcut.activated.connect(self.keypoints.clear_selected)
         
         self.data = []
         self.saved = True
@@ -84,7 +90,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.save_loc = None
         # self.initialize_save_loc()
         self.save_filename = None
-        self.initialize_new_file('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526', 'video')
+        if cfg.path is not None:
+            assert os.path.exists(cfg.path)
+            ending = os.path.splitext(cfg.path)[1]
+            if ending.lower() in image_endings:
+                filetype = 'image'
+            elif ending.lower() in video_endings:
+                filetype = 'video'
+            elif os.path.isdir(cfg.path):
+                filetype = 'video'
+            else:
+                raise ValueError('filetype of input not known: {}'.format(cfg.path))
+            self.initialize_new_file(cfg.path, filetype)
         
         self.show()
         
@@ -156,6 +173,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.save_filename = os.path.join(save_loc, 
                                           os.path.splitext(os.path.basename(filename))[0] + '_keypoints.csv')
         self.data = [deepcopy(self.keypoint_dict) for i in range(N)]
+        if os.path.isfile(self.save_filename):
+            self.load(self.save_filename)
         
         
     def initialize_keypoint_group(self, keypoints: dict):
@@ -183,8 +202,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # print(self.keypoint_dict)
             
     @QtCore.Slot(int)
-    def update_framenum(self, framenum):
-        if self.framenum != framenum:
+    def update_framenum(self, framenum, force: bool=False):
+        if self.framenum != framenum or force:
             # convenience: rather than dig this value out of the widgets, the app will have this attribute
             self.framenum = framenum
             keypoints = self.data[framenum]
@@ -202,34 +221,46 @@ class MainWindow(QtWidgets.QMainWindow):
     
     
     def save(self):
-        has_any_data = []
-        for element in self.data:
-            frame_has_data = False
-            for key, value in element.items():
-                if len(value) > 0:
-                    frame_has_data = True
-                    break
-            has_any_data.append(frame_has_data)
+        # has_any_data = []
+        # for element in self.data:
+        #     frame_has_data = False
+        #     for key, value in element.items():
+        #         if len(value) > 0:
+        #             frame_has_data = True
+        #             break
+        #     has_any_data.append(frame_has_data)
         
-        data = {}
-        for i, element in enumerate(self.data):
-            row = {}
-            if not has_any_data[i]:
-                continue
-            for key, value in element.items():
-                if value is None:
-                    value = [np.nan, np.nan]
-                row[key + '_x'] = value[0]
-                row[key + '_y'] = value[1]
-            data[i] = row
+        # data = {}
+        # for i, element in enumerate(self.data):
+        #     row = {}
+        #     if not has_any_data[i]:
+        #         continue
+        #     for key, value in element.items():
+        #         if value is None:
+        #             value = [np.nan, np.nan, 0]
+        #         row[key + '_x'] = value[0]
+        #         row[key + '_y'] = value[1]
+        #         row[key + '_p'] = 1
+        #     data[i] = row
             
-        df = pd.DataFrame(data)
-        # switch rows and columns
-        df = df.T
-        
+        # df = pd.DataFrame(data)
+        # # switch rows and columns
+        # df = df.T
+        df = utils.convert_data_to_df(self.data)
         df.to_csv(self.save_filename)
         print('saving to {}'.format(self.save_filename))
         return df
+    
+    def load(self, filename):
+        assert os.path.isfile(filename)
+        print('loading from {}'.format(filename))
+        df = pd.read_csv(filename, index_col=0)
+        # data is initialized when we load our video
+        data = utils.convert_df_to_data(df, len(self.data), self.keypoint_dict)
+        df.head()
+        self.data = data
+        # do this to re-load the zeroth frame with data
+        self.update_framenum(0, force=True)
             
     def prompt_for_save(self):
         if self.saved:
@@ -264,22 +295,25 @@ def set_style(app):
     app.setPalette(darktheme)
     return app
 
-if __name__ == '__main__':
-    # log.info('CWD: {}'.format(os.getcwd()))
-    # log.info('Configuration used: {}'.format(cfg.pretty()))
+def run():
     app = QtWidgets.QApplication(sys.argv)
     app = set_style(app)
     
-    default_path = os.path.join(os.path.dirname(__file__), 'gui', 'default_config.yaml')
+    default_path = os.path.join(os.path.dirname(__file__), 'default_config.yaml')
     
     default = OmegaConf.load(default_path)
     cli = OmegaConf.from_cli()
-    
     cfg = OmegaConf.merge(default, cli)
+    OmegaConf.set_struct(cfg, True)
 
     window = MainWindow(cfg)
     window.resize(1024, 768)
     window.show()
 
     sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    # log.info('CWD: {}'.format(os.getcwd()))
+    # log.info('Configuration used: {}'.format(cfg.pretty()))
+    run()
     

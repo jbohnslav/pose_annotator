@@ -26,6 +26,8 @@ class Ui_MainWindow(object):
         self.actionOpen_image_directory.setObjectName(u"actionOpen_image_directory")
         self.actionOpen_video = QAction(MainWindow)
         self.actionOpen_video.setObjectName(u"actionOpen_video")
+        self.actionSave = QAction(MainWindow)
+        self.actionSave.setObjectName(u"actionSave")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -55,6 +57,16 @@ class Ui_MainWindow(object):
         self.toolButton_2.setMaximumSize(QSize(30, 30))
 
         self.gridLayout_2.addWidget(self.toolButton_2, 0, 1, 1, 1)
+
+        self.toolButton_3 = QToolButton(self.toolbox)
+        self.toolButton_3.setObjectName(u"toolButton_3")
+
+        self.gridLayout_2.addWidget(self.toolButton_3, 1, 0, 1, 1)
+
+        self.toolButton_4 = QToolButton(self.toolbox)
+        self.toolButton_4.setObjectName(u"toolButton_4")
+
+        self.gridLayout_2.addWidget(self.toolButton_4, 1, 1, 1, 1)
 
 
         self.verticalLayout.addWidget(self.toolbox)
@@ -97,6 +109,7 @@ class Ui_MainWindow(object):
 
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuOpen_image_or_video.menuAction())
+        self.menuFile.addAction(self.actionSave)
         self.menuOpen_image_or_video.addAction(self.actionOpen_image)
         self.menuOpen_image_or_video.addAction(self.actionOpen_image_directory)
         self.menuOpen_image_or_video.addAction(self.actionOpen_video)
@@ -111,9 +124,12 @@ class Ui_MainWindow(object):
         self.actionOpen_image.setText(QCoreApplication.translate("MainWindow", u"Open image", None))
         self.actionOpen_image_directory.setText(QCoreApplication.translate("MainWindow", u"Open image directory", None))
         self.actionOpen_video.setText(QCoreApplication.translate("MainWindow", u"Open video", None))
+        self.actionSave.setText(QCoreApplication.translate("MainWindow", u"Save", None))
         self.toolbox.setTitle(QCoreApplication.translate("MainWindow", u"Tools", None))
         self.toolButton.setText(QCoreApplication.translate("MainWindow", u"...", None))
         self.toolButton_2.setText(QCoreApplication.translate("MainWindow", u"...", None))
+        self.toolButton_3.setText(QCoreApplication.translate("MainWindow", u"...", None))
+        self.toolButton_4.setText(QCoreApplication.translate("MainWindow", u"...", None))
         self.keypoints_box.setTitle(QCoreApplication.translate("MainWindow", u"Keypoints", None))
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuOpen_image_or_video.setTitle(QCoreApplication.translate("MainWindow", u"Open image or video", None))
