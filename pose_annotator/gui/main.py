@@ -61,11 +61,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.keypoint_selector.selected.connect(self.keypoints.set_selected)
         self.keypoints.selected.connect(self.keypoint_selector.set_selected)
         self.player.videoView.frameNum.connect(self.update_framenum)
+        
         # menu buttons
         self.ui.actionOpen_image.triggered.connect(self.open_image_file)
         self.ui.actionOpen_image_directory.triggered.connect(self.open_image_directory)
         self.ui.actionOpen_video.triggered.connect(self.open_video)
-        
+        self.ui.actionSave.triggered.connect(self.save)
+
         # hotkeys
         save_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+S'), self)
         save_shortcut.activated.connect(self.save)
