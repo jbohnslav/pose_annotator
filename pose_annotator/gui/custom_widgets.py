@@ -95,6 +95,9 @@ class VideoFrame(QtWidgets.QGraphicsView):
         self.setMouseTracking(True)    
     
     def initialize_image(self, imagefile: Union[str, os.PathLike])    : 
+        if self.vid is not None:
+            self.vid.close()
+            
         self.videofile = imagefile
         assert os.path.isfile(imagefile)
         
