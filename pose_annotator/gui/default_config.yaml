@@ -11,4 +11,5 @@ autosave: False
 save_loc: null
 path: null
 user_cfg: null
+resize_on_each_frame: True
 

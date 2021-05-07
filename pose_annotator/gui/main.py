@@ -28,11 +28,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle('Pose Annotator')
         
         self.player = self.ui.widget
+        self.player.videoView.resize_on_each_frame = self.cfg.resize_on_each_frame
         # for convenience
         self.scene = self.player.scene
-        # self.player.videoView.initialize_image('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526/SS21_190508_140054_002526_right_post_l.png')
-        # self.player.videoView.initialize_video('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526')
-        
+         
         keys = OmegaConf.to_container(cfg.keypoints)
         self.keypoint_dict = OrderedDict({key: [] for key in keys})
         # self.keypoint_dict = {key: [] for key in keys}
@@ -105,9 +104,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 raise ValueError('filetype of input not known: {}'.format(cfg.path))
             self.initialize_new_file(cfg.path, filetype)
         
-
-        self.initialize_new_file('/Users/calebsw/Dropbox (HMS)/caleb weinreb/PROJECTS/MOUSE_SURVEILANCE/21_2_19_segmentation_redux/C57_vs_C57_v2/training_data/annotations1_top','video')
-
         self.show()
         
     def get_save_loc(self):

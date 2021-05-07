@@ -1,6 +1,6 @@
 from PySide2 import QtCore, QtGui, QtWidgets
 from PySide2.QtWidgets import (QGroupBox, QFormLayout, QLabel, QLineEdit, QVBoxLayout, QWidget, QMainWindow)
-from PySide2.QtCore import Qt, Signal, Slot, QPoint
+from PySide2.QtCore import Qt, Signal, Slot, QPoint, QEvent
 from PySide2.QtGui import QPainter, QBrush, QPen, QPixmap, QColor
 from typing import Union, Tuple
 import os
@@ -46,6 +46,8 @@ class ClickableScene(QtWidgets.QGraphicsScene):
     release = QtCore.Signal(QtGui.QMouseEvent)
     def __init__(self, parent=None):
         super().__init__(parent)
+
+
         
     def mousePressEvent(self, event):
         if event.buttons():
@@ -60,6 +62,7 @@ class ClickableScene(QtWidgets.QGraphicsScene):
     def mouseReleaseEvent(self, event):
         self.release.emit(event)
         super().mouseReleaseEvent(event)
+
         
 
 class VideoFrame(QtWidgets.QGraphicsView):
@@ -93,6 +96,20 @@ class VideoFrame(QtWidgets.QGraphicsView):
             self.update()
         self.setStyleSheet("background:transparent;")
         self.setMouseTracking(True)    
+
+        # for pan/zoom
+        self.resize_on_each_frame = True
+        self.grabGesture(Qt.PinchGesture)
+        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+
+    def event(self, event):
+        out = super(VideoFrame, self).event(event)
+        if type(event)==QtWidgets.QGestureEvent:
+            gesture = event.gesture(Qt.PinchGesture)
+            scale = gesture.scaleFactor()
+            last_scale = gesture.lastScaleFactor()
+            self.scale(scale, last_scale)
+        return out
     
     def initialize_image(self, imagefile: Union[str, os.PathLike])    : 
         if self.vid is not None:
@@ -115,6 +132,7 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # print('new fnum: {}'.format(self.current_fnum))
         self.show_image(self.frame)
         self.frameNum.emit(self.current_fnum)
+        self.fitInView()
 
         # print(self.palette())
 
@@ -129,6 +147,7 @@ class VideoFrame(QtWidgets.QGraphicsView):
         self.initialized.emit(len(self.vid))
         # there was a bug where sometimes subsequent videos with the same frame would not update the image
         self.update_frame(0, force_update=True)
+        self.fitInView()
 
     def get_image_names(self):
         if self.vid is None: # single image
@@ -167,6 +186,7 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # print('new fnum: {}'.format(self.current_fnum))
         self.show_image(self.frame)
         self.frameNum.emit(self.current_fnum)
+        if self.resize_on_each_frame: self.fitInView()
         
     def next_frame(self):
         self.update_frame(self.current_fnum + 1)
@@ -208,13 +228,13 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # THIS LINE CHANGES THE SCENE WIDTH AND HEIGHT
         self._photo.setPixmap(qpixmap)
 
-        self.fitInView()
+        if self.resize_on_each_frame: self.fitInView()
         self.update()
         # self.show()
 
-    def resizeEvent(self, event):
-        if hasattr(self, 'vid'):
-            self.fitInView()
+    # def resizeEvent(self, event):
+    #     if hasattr(self, 'vid'):
+    #         self.fitInView()
 
 
 class ScrollbarWithText(QtWidgets.QWidget):
@@ -678,26 +698,6 @@ class KeypointButtons(QtWidgets.QWidget):
         self.selected.emit(self.index)
 
         
-class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
-
-        widget = VideoPlayer(videoFile=r'/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526')
-        
-        kp = {'nose': (50, 50, 5), 
-              'forepaw': (100,100,5), 
-              'hindpaw': []}
-        
-        keypoints = KeypointGroup(kp, scene=widget.scene, parent=widget, radius=5)
-        widget.scene.click.connect(keypoints.receive_click)
-        widget.scene.move.connect(keypoints.receive_move)
-        widget.scene.release.connect(keypoints.receive_release)
-        # keypoint = Keypoint(100, 100, parent=widget)
-        # widget.scene.addItem(keypoint)
-        # scene =CroppingOverlay(self)
-        # view = QtWidgets.QGraphicsView(scene)
-        self.setCentralWidget(widget)
-
 
 def simple_popup_question(parent, message: str):
     # message = 'You have unsaved changes. Are you sure you want to quit?'
@@ -705,20 +705,3 @@ def simple_popup_question(parent, message: str):
                                            message, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
     return reply == QtWidgets.QMessageBox.Yes
 
-
-if __name__ == '__main__':
-    app = QtWidgets.QApplication([])
-    # testing = VideoPlayer(videoFile=r'/home/jb/Downloads/Basler_acA1300-200um__22273960__20200120_113922411.mp4')
-    testing = MainWindow()
-    testing.resize(640, 480)
-    # volume = VideoPlayer(r'C:\DATA\mouse_reach_processed\M134_20141203_v001.h5')
-    # testing = QtWidgets.QMainWindow()
-    # testing.initialize(n=6, n_timepoints=15000, debug=True)
-    # testing = ShouldRunInference(['M134_20141203_v001',
-    #                               'M134_20141203_v002',
-    #                               'M134_20141203_v004'],
-    #                              [True, True, False])
-    # testing = MainWindow()
-    # testing.setMaximumHeight(250)
-    testing.show()
-    app.exec_()

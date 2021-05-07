@@ -42,12 +42,11 @@ def convert_data_to_df(data: list, image_names=None) -> pd.DataFrame:
         indices.append(i)
 
     df = pd.DataFrame( data=rows, columns=keys, index=indices)
-
     if image_names is not None:
         df = df.join(pd.DataFrame(
             data=[image_names[i] for i in indices], 
             columns=['image_name'], index=indices))
-        
+
     return df
 
 def convert_row_to_dict(row) -> dict:
