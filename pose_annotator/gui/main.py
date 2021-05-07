@@ -61,7 +61,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.keypoint_selector.selected.connect(self.keypoints.set_selected)
         self.keypoints.selected.connect(self.keypoint_selector.set_selected)
         self.player.videoView.frameNum.connect(self.update_framenum)
-        
+
         # menu buttons
         self.ui.actionOpen_image.triggered.connect(self.open_image_file)
         self.ui.actionOpen_image_directory.triggered.connect(self.open_image_directory)
@@ -105,6 +105,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 raise ValueError('filetype of input not known: {}'.format(cfg.path))
             self.initialize_new_file(cfg.path, filetype)
         
+
+        self.initialize_new_file('/Users/calebsw/Dropbox (HMS)/caleb weinreb/PROJECTS/MOUSE_SURVEILANCE/21_2_19_segmentation_redux/C57_vs_C57_v2/training_data/annotations1_top','video')
+
         self.show()
         
     def get_save_loc(self):
@@ -223,31 +226,11 @@ class MainWindow(QtWidgets.QMainWindow):
     
     
     def save(self):
-        # has_any_data = []
-        # for element in self.data:
-        #     frame_has_data = False
-        #     for key, value in element.items():
-        #         if len(value) > 0:
-        #             frame_has_data = True
-        #             break
-        #     has_any_data.append(frame_has_data)
-        
-        # data = {}
-        # for i, element in enumerate(self.data):
-        #     row = {}
-        #     if not has_any_data[i]:
-        #         continue
-        #     for key, value in element.items():
-        #         if value is None:
-        #             value = [np.nan, np.nan, 0]
-        #         row[key + '_x'] = value[0]
-        #         row[key + '_y'] = value[1]
-        #         row[key + '_p'] = 1
-        #     data[i] = row
-            
-        # df = pd.DataFrame(data)
-        # # switch rows and columns
-        # df = df.T
+        # add image names to data
+        if self.cfg.save_image_names:
+            image_names = self.player.videoView.get_image_names()
+            for row,name in zip(self.data,image_names): row['image_name'] = name
+
         df = utils.convert_data_to_df(self.data)
         df.to_csv(self.save_filename)
         print('saving to {}'.format(self.save_filename))
@@ -258,6 +241,8 @@ class MainWindow(QtWidgets.QMainWindow):
         assert os.path.isfile(filename)
         print('loading from {}'.format(filename))
         df = pd.read_csv(filename, index_col=0)
+        if 'image_name' in df: del df['image_name']
+
         # data is initialized when we load our video
         data = utils.convert_df_to_data(df, len(self.data), self.keypoint_dict)
         df.head()

@@ -97,7 +97,8 @@ class VideoFrame(QtWidgets.QGraphicsView):
     def initialize_image(self, imagefile: Union[str, os.PathLike])    : 
         if self.vid is not None:
             self.vid.close()
-            
+            self.vid = None
+
         self.videofile = imagefile
         assert os.path.isfile(imagefile)
         
@@ -120,14 +121,23 @@ class VideoFrame(QtWidgets.QGraphicsView):
     def initialize_video(self, videofile: Union[str, os.PathLike]):
         if self.vid is not None:
             self.vid.close()
-            # if hasattr(self.vid, 'cap'):
-            #     self.vid.cap.release()
+            self.vid = None
+
         self.videofile = videofile
         self.vid = VideoReader(videofile)
         # self.frame = next(self.vid)
         self.initialized.emit(len(self.vid))
         # there was a bug where sometimes subsequent videos with the same frame would not update the image
         self.update_frame(0, force_update=True)
+
+    def get_image_names(self):
+        if self.vid is None: # single image
+            return [self.videofile]
+        elif isinstance(self.vid.file_object, list): # image directory 
+            return [os.path.split(n)[1] for n in self.vid.file_object]
+        else: # video
+            return [self.videofile]*len(self.vid)
+        
 
     def update_frame(self, value, force_update: bool=False):
         # print('updating')
