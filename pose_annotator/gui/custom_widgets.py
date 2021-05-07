@@ -609,12 +609,11 @@ class KeypointGroup(QtWidgets.QWidget):
         x, y = pos.x(), pos.y()
         # print(x,y)
         # print(event.buttons())
-        if event.buttons() == QtCore.Qt.LeftButton:
-            # print(self.tmp_selected)
+        if ((self.click_type_to_add_keypoint != 'left' and event.buttons() == QtCore.Qt.LeftButton) or
+            (self.click_type_to_add_keypoint == 'left' and event.buttons() == QtCore.Qt.RightButton)):
             if self.tmp_selected is None:
                 return
-            
-            
+
             self.keypoints[self.keys[self.tmp_selected]].set_coords(x, y, self.radius)
             self.broadcast_data()
         if self.text_over_mouse:
