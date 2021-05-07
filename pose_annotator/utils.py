@@ -14,7 +14,7 @@ def check_for_any_data(data: list) -> list:
         has_any_data.append(frame_has_data)
     return has_any_data
 
-def convert_data_to_df(data: list) -> pd.DataFrame:
+def convert_data_to_df(data: list, image_names=None) -> pd.DataFrame:
     has_any_data = check_for_any_data(data)
     
     # rows = {}
@@ -26,29 +26,28 @@ def convert_data_to_df(data: list) -> pd.DataFrame:
         if not has_any_data[i]:
             continue
         for key, value in element.items():
-            if key=='image_name':
-                row[key] = value
-                if i==0:
-                    keys.append(key)
+            if value is None or np.isnan(value).sum() > 0:
+                value = [np.nan, np.nan]
+                p = 0
             else:
-                if value is None or np.isnan(value).sum() > 0:
-                    value = [np.nan, np.nan]
-                    p = 0
-                else:
-                    p = 1
-                row[key + '_x'] = value[0]
-                row[key + '_y'] = value[1]
-                row[key + '_p'] = p
-                if i == 0:
-                    keys.append(key + '_x')
-                    keys.append(key + '_y')
-                    keys.append(key + '_p')
+                p = 1
+            row[key + '_x'] = value[0]
+            row[key + '_y'] = value[1]
+            row[key + '_p'] = p
+            if i == 0:
+                keys.append(key + '_x')
+                keys.append(key + '_y')
+                keys.append(key + '_p')
         rows.append(row)
         indices.append(i)
-    df = pd.DataFrame( data=rows, columns=keys, index=indices)
-    # switch rows and columns
-    # df = df.T
 
+    df = pd.DataFrame( data=rows, columns=keys, index=indices)
+
+    if image_names is not None:
+        df = df.join(pd.DataFrame(
+            data=[image_names[i] for i in indices], 
+            columns=['image_name'], index=indices))
+        
     return df
 
 def convert_row_to_dict(row) -> dict:

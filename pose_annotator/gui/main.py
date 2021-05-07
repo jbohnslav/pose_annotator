@@ -202,9 +202,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # keep the real data
         self.data[self.framenum] = deepcopy(data)
         self.saved = False
-        # print(self.data)
-        # print(data)
-        # print(self.keypoint_dict)
+        if self.cfg.autosave:
+            self.save()
             
     @QtCore.Slot(int)
     def update_framenum(self, framenum, force: bool=False):
@@ -227,11 +226,11 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def save(self):
         # add image names to data
+        image_names = None
         if self.cfg.save_image_names:
             image_names = self.player.videoView.get_image_names()
-            for row,name in zip(self.data,image_names): row['image_name'] = name
 
-        df = utils.convert_data_to_df(self.data)
+        df = utils.convert_data_to_df(self.data, image_names=image_names)
         df.to_csv(self.save_filename)
         print('saving to {}'.format(self.save_filename))
         self.saved = True

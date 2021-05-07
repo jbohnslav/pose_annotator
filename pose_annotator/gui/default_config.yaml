@@ -7,6 +7,8 @@ viz:
   radius: 5
   text_over_mouse: True
 save_image_names: False
+autosave: False
 save_loc: null
 path: null
 user_cfg: null
+
