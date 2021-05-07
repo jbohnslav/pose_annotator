@@ -12,4 +12,4 @@ save_loc: null
 path: null
 user_cfg: null
 resize_on_each_frame: True
-
+click_type_to_add_keypoint: right

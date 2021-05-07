@@ -37,8 +37,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.keypoint_dict = {key: [] for key in keys}
         self.keypoints = None
         
-        self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, 
-                                       parent=self.player, colormap=self.cfg.viz.colormap, radius=self.cfg.viz.radius)
+        self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, parent=self.player, 
+                                       colormap=self.cfg.viz.colormap, radius=self.cfg.viz.radius,
+                                       click_type_to_add_keypoint=self.cfg.click_type_to_add_keypoint)
         
         self.keypoint_selector = KeypointButtons(keys, colormap=cfg.viz.colormap, parent=self)
         self.ui.verticalLayout_2.addWidget(self.keypoint_selector)

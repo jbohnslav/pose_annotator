@@ -46,8 +46,6 @@ class ClickableScene(QtWidgets.QGraphicsScene):
     release = QtCore.Signal(QtGui.QMouseEvent)
     def __init__(self, parent=None):
         super().__init__(parent)
-
-
         
     def mousePressEvent(self, event):
         if event.buttons():
@@ -439,7 +437,7 @@ class KeypointGroup(QtWidgets.QWidget):
     data = Signal(dict)
     
     def __init__(self, keypoint_dict, scene, parent=None, colormap:str='viridis', radius=20, 
-                 text_over_mouse=True):
+                 text_over_mouse=True, click_type_to_add_keypoint='right'):
         super().__init__(parent)
         
         self.cmap = plt.get_cmap(colormap)
@@ -462,6 +460,7 @@ class KeypointGroup(QtWidgets.QWidget):
         self.scene = scene
         self.tmp_selected = None
         self.text_over_mouse = text_over_mouse
+        self.click_type_to_add_keypoint = click_type_to_add_keypoint
         self.set_data(keypoint_dict)
         self.text = None
         self.update_text()
@@ -545,7 +544,7 @@ class KeypointGroup(QtWidgets.QWidget):
         self.text.setBrush(brush)
         self.text.setPen(pen)
     
-    def right_click(self, event):
+    def add_keypoint(self, event):
         pos = event.scenePos()
         x, y = pos.x(), pos.y()
         
@@ -557,7 +556,7 @@ class KeypointGroup(QtWidgets.QWidget):
         # print(x,y)
         self.set_selected(self.index+1)
         
-    def left_click(self, event):
+    def move_keypoint(self, event):
         pos = event.scenePos()
         x, y = pos.x(), pos.y()
         dists = self.get_distance_to_keypoints(x, y)
@@ -593,9 +592,16 @@ class KeypointGroup(QtWidgets.QWidget):
     @Slot(QtGui.QMouseEvent)
     def receive_click(self, event):
         if event.button() == QtCore.Qt.RightButton:
-            self.right_click(event)
+            if self.click_type_to_add_keypoint == 'left':
+                self.move_keypoint(event)
+            else:
+                self.add_keypoint(event)
+
         elif event.button() == QtCore.Qt.LeftButton:
-            self.left_click(event)
+            if self.click_type_to_add_keypoint == 'left':
+                self.add_keypoint(event)
+            else:
+                self.move_keypoint(event)
     
     @Slot(QtGui.QMouseEvent)
     def receive_move(self, event):
