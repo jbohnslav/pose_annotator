@@ -4,6 +4,8 @@ from functools import partial
 import os
 import sys
 
+os.environ['QT_MAC_WANTS_LAYER'] = '1'
+
 import numpy as np
 from omegaconf import OmegaConf, DictConfig
 import pandas as pd
