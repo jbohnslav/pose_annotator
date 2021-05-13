@@ -5,7 +5,7 @@ with open("README.md", 'r') as f:
 
 setuptools.setup(
     name='pose_annotator',
-    version='0.0.1.post0',
+    version='0.0.2',
     author='Jim Bohnslav',
     author_email='jbohnslav@gmail.com',
     description='Keypoint annotation GUI',
