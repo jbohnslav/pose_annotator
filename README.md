@@ -25,3 +25,7 @@ Customize [default_config.yaml](pose_annotator/gui/default_config.yaml) then lau
 	* annotations are matched to image files by rank-order of the filename
 * `ModuleNotFoundError: No module named 'skbuild'`
   * please `pip install --upgrade pip`
+
+## TODO
+* Make player resize image appropriately on startup
+  * current behavior: changing frame resizes images to fit in view; does not expand size on image resize
