@@ -1,6 +1,6 @@
 from PySide2 import QtCore, QtGui, QtWidgets
 from PySide2.QtWidgets import (QGroupBox, QFormLayout, QLabel, QLineEdit, QVBoxLayout, QWidget, QMainWindow)
-from PySide2.QtCore import Qt, Signal, Slot, QPoint
+from PySide2.QtCore import Qt, Signal, Slot, QPoint, QEvent
 from PySide2.QtGui import QPainter, QBrush, QPen, QPixmap, QColor
 from typing import Union, Tuple
 import os
@@ -60,6 +60,7 @@ class ClickableScene(QtWidgets.QGraphicsScene):
     def mouseReleaseEvent(self, event):
         self.release.emit(event)
         super().mouseReleaseEvent(event)
+
         
 
 class VideoFrame(QtWidgets.QGraphicsView):
@@ -93,8 +94,26 @@ class VideoFrame(QtWidgets.QGraphicsView):
             self.update()
         self.setStyleSheet("background:transparent;")
         self.setMouseTracking(True)    
+
+        # for pan/zoom
+        self.resize_on_each_frame = True
+        self.grabGesture(Qt.PinchGesture)
+        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+
+    def event(self, event):
+        out = super(VideoFrame, self).event(event)
+        if type(event)==QtWidgets.QGestureEvent:
+            gesture = event.gesture(Qt.PinchGesture)
+            scale = gesture.scaleFactor()
+            last_scale = gesture.lastScaleFactor()
+            self.scale(scale, last_scale)
+        return out
     
     def initialize_image(self, imagefile: Union[str, os.PathLike])    : 
+        if self.vid is not None:
+            self.vid.close()
+            self.vid = None
+
         self.videofile = imagefile
         assert os.path.isfile(imagefile)
         
@@ -111,20 +130,31 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # print('new fnum: {}'.format(self.current_fnum))
         self.show_image(self.frame)
         self.frameNum.emit(self.current_fnum)
+        self.fitInView()
 
         # print(self.palette())
 
     def initialize_video(self, videofile: Union[str, os.PathLike]):
         if self.vid is not None:
             self.vid.close()
-            # if hasattr(self.vid, 'cap'):
-            #     self.vid.cap.release()
+            self.vid = None
+
         self.videofile = videofile
         self.vid = VideoReader(videofile)
         # self.frame = next(self.vid)
         self.initialized.emit(len(self.vid))
         # there was a bug where sometimes subsequent videos with the same frame would not update the image
         self.update_frame(0, force_update=True)
+        self.fitInView()
+
+    def get_image_names(self):
+        if self.vid is None: # single image
+            return [self.videofile]
+        elif isinstance(self.vid.file_object, list): # image directory 
+            return [os.path.split(n)[1] for n in self.vid.file_object]
+        else: # video
+            return [self.videofile]*len(self.vid)
+        
 
     def update_frame(self, value, force_update: bool=False):
         # print('updating')
@@ -154,6 +184,7 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # print('new fnum: {}'.format(self.current_fnum))
         self.show_image(self.frame)
         self.frameNum.emit(self.current_fnum)
+        if self.resize_on_each_frame: self.fitInView()
         
     def next_frame(self):
         self.update_frame(self.current_fnum + 1)
@@ -195,13 +226,13 @@ class VideoFrame(QtWidgets.QGraphicsView):
         # THIS LINE CHANGES THE SCENE WIDTH AND HEIGHT
         self._photo.setPixmap(qpixmap)
 
-        self.fitInView()
+        if self.resize_on_each_frame: self.fitInView()
         self.update()
         # self.show()
 
-    def resizeEvent(self, event):
-        if hasattr(self, 'vid'):
-            self.fitInView()
+    # def resizeEvent(self, event):
+    #     if hasattr(self, 'vid'):
+    #         self.fitInView()
 
 
 class ScrollbarWithText(QtWidgets.QWidget):
@@ -406,7 +437,7 @@ class KeypointGroup(QtWidgets.QWidget):
     data = Signal(dict)
     
     def __init__(self, keypoint_dict, scene, parent=None, colormap:str='viridis', radius=20, 
-                 text_over_mouse=True):
+                 text_over_mouse=True, click_type_to_add_keypoint='right'):
         super().__init__(parent)
         
         self.cmap = plt.get_cmap(colormap)
@@ -429,6 +460,7 @@ class KeypointGroup(QtWidgets.QWidget):
         self.scene = scene
         self.tmp_selected = None
         self.text_over_mouse = text_over_mouse
+        self.click_type_to_add_keypoint = click_type_to_add_keypoint
         self.set_data(keypoint_dict)
         self.text = None
         self.update_text()
@@ -512,7 +544,7 @@ class KeypointGroup(QtWidgets.QWidget):
         self.text.setBrush(brush)
         self.text.setPen(pen)
     
-    def right_click(self, event):
+    def add_keypoint(self, event):
         pos = event.scenePos()
         x, y = pos.x(), pos.y()
         
@@ -524,7 +556,7 @@ class KeypointGroup(QtWidgets.QWidget):
         # print(x,y)
         self.set_selected(self.index+1)
         
-    def left_click(self, event):
+    def move_keypoint(self, event):
         pos = event.scenePos()
         x, y = pos.x(), pos.y()
         dists = self.get_distance_to_keypoints(x, y)
@@ -560,9 +592,16 @@ class KeypointGroup(QtWidgets.QWidget):
     @Slot(QtGui.QMouseEvent)
     def receive_click(self, event):
         if event.button() == QtCore.Qt.RightButton:
-            self.right_click(event)
+            if self.click_type_to_add_keypoint == 'left':
+                self.move_keypoint(event)
+            else:
+                self.add_keypoint(event)
+
         elif event.button() == QtCore.Qt.LeftButton:
-            self.left_click(event)
+            if self.click_type_to_add_keypoint == 'left':
+                self.add_keypoint(event)
+            else:
+                self.move_keypoint(event)
     
     @Slot(QtGui.QMouseEvent)
     def receive_move(self, event):
@@ -570,12 +609,11 @@ class KeypointGroup(QtWidgets.QWidget):
         x, y = pos.x(), pos.y()
         # print(x,y)
         # print(event.buttons())
-        if event.buttons() == QtCore.Qt.LeftButton:
-            # print(self.tmp_selected)
+        if ((self.click_type_to_add_keypoint != 'left' and event.buttons() == QtCore.Qt.LeftButton) or
+            (self.click_type_to_add_keypoint == 'left' and event.buttons() == QtCore.Qt.RightButton)):
             if self.tmp_selected is None:
                 return
-            
-            
+
             self.keypoints[self.keys[self.tmp_selected]].set_coords(x, y, self.radius)
             self.broadcast_data()
         if self.text_over_mouse:
@@ -665,26 +703,6 @@ class KeypointButtons(QtWidgets.QWidget):
         self.selected.emit(self.index)
 
         
-class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
-
-        widget = VideoPlayer(videoFile=r'/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526')
-        
-        kp = {'nose': (50, 50, 5), 
-              'forepaw': (100,100,5), 
-              'hindpaw': []}
-        
-        keypoints = KeypointGroup(kp, scene=widget.scene, parent=widget, radius=5)
-        widget.scene.click.connect(keypoints.receive_click)
-        widget.scene.move.connect(keypoints.receive_move)
-        widget.scene.release.connect(keypoints.receive_release)
-        # keypoint = Keypoint(100, 100, parent=widget)
-        # widget.scene.addItem(keypoint)
-        # scene =CroppingOverlay(self)
-        # view = QtWidgets.QGraphicsView(scene)
-        self.setCentralWidget(widget)
-
 
 def simple_popup_question(parent, message: str):
     # message = 'You have unsaved changes. Are you sure you want to quit?'
@@ -692,20 +710,3 @@ def simple_popup_question(parent, message: str):
                                            message, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
     return reply == QtWidgets.QMessageBox.Yes
 
-
-if __name__ == '__main__':
-    app = QtWidgets.QApplication([])
-    # testing = VideoPlayer(videoFile=r'/home/jb/Downloads/Basler_acA1300-200um__22273960__20200120_113922411.mp4')
-    testing = MainWindow()
-    testing.resize(640, 480)
-    # volume = VideoPlayer(r'C:\DATA\mouse_reach_processed\M134_20141203_v001.h5')
-    # testing = QtWidgets.QMainWindow()
-    # testing.initialize(n=6, n_timepoints=15000, debug=True)
-    # testing = ShouldRunInference(['M134_20141203_v001',
-    #                               'M134_20141203_v002',
-    #                               'M134_20141203_v004'],
-    #                              [True, True, False])
-    # testing = MainWindow()
-    # testing.setMaximumHeight(250)
-    testing.show()
-    app.exec_()

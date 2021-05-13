@@ -8,13 +8,13 @@ def check_for_any_data(data: list) -> list:
     for element in data:
         frame_has_data = False
         for key, value in element.items():
-            if len(value) > 0:
+            if key != 'image_name' and len(value) > 0:
                 frame_has_data = True
                 break
         has_any_data.append(frame_has_data)
     return has_any_data
 
-def convert_data_to_df(data: list) -> pd.DataFrame:
+def convert_data_to_df(data: list, image_names=None) -> pd.DataFrame:
     has_any_data = check_for_any_data(data)
     
     # rows = {}
@@ -40,9 +40,12 @@ def convert_data_to_df(data: list) -> pd.DataFrame:
                 keys.append(key + '_p')
         rows.append(row)
         indices.append(i)
+
     df = pd.DataFrame( data=rows, columns=keys, index=indices)
-    # switch rows and columns
-    # df = df.T
+    if image_names is not None:
+        df = df.join(pd.DataFrame(
+            data=[image_names[i] for i in indices], 
+            columns=['image_name'], index=indices))
 
     return df
 

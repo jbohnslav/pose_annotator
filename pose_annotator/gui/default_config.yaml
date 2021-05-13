@@ -6,6 +6,10 @@ viz:
   colormap: viridis
   radius: 5
   text_over_mouse: True
+save_image_names: False
+autosave: False
 save_loc: null
 path: null
 user_cfg: null
+resize_on_each_frame: True
+click_type_to_add_keypoint: right

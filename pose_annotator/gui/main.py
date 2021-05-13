@@ -4,6 +4,8 @@ from functools import partial
 import os
 import sys
 
+os.environ['QT_MAC_WANTS_LAYER'] = '1'
+
 import numpy as np
 from omegaconf import OmegaConf, DictConfig
 import pandas as pd
@@ -28,18 +30,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle('Pose Annotator')
         
         self.player = self.ui.widget
+        self.player.videoView.resize_on_each_frame = self.cfg.resize_on_each_frame
         # for convenience
         self.scene = self.player.scene
-        # self.player.videoView.initialize_image('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526/SS21_190508_140054_002526_right_post_l.png')
-        # self.player.videoView.initialize_video('/media/jim/DATA_SSD/armo/dataset_for_labeling/images/SS21_190508_140054_002526')
-        
+         
         keys = OmegaConf.to_container(cfg.keypoints)
         self.keypoint_dict = OrderedDict({key: [] for key in keys})
         # self.keypoint_dict = {key: [] for key in keys}
         self.keypoints = None
         
-        self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, 
-                                       parent=self.player, colormap=self.cfg.viz.colormap, radius=self.cfg.viz.radius)
+        self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, parent=self.player, 
+                                       colormap=self.cfg.viz.colormap, radius=self.cfg.viz.radius,
+                                       click_type_to_add_keypoint=self.cfg.click_type_to_add_keypoint)
         
         self.keypoint_selector = KeypointButtons(keys, colormap=cfg.viz.colormap, parent=self)
         self.ui.verticalLayout_2.addWidget(self.keypoint_selector)
@@ -61,11 +63,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.keypoint_selector.selected.connect(self.keypoints.set_selected)
         self.keypoints.selected.connect(self.keypoint_selector.set_selected)
         self.player.videoView.frameNum.connect(self.update_framenum)
+
         # menu buttons
         self.ui.actionOpen_image.triggered.connect(self.open_image_file)
         self.ui.actionOpen_image_directory.triggered.connect(self.open_image_directory)
         self.ui.actionOpen_video.triggered.connect(self.open_video)
-        
+        self.ui.actionSave.triggered.connect(self.save)
+
         # hotkeys
         save_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+S'), self)
         save_shortcut.activated.connect(self.save)
@@ -197,9 +201,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # keep the real data
         self.data[self.framenum] = deepcopy(data)
         self.saved = False
-        # print(self.data)
-        # print(data)
-        # print(self.keypoint_dict)
+        if self.cfg.autosave:
+            self.save()
             
     @QtCore.Slot(int)
     def update_framenum(self, framenum, force: bool=False):
@@ -221,32 +224,12 @@ class MainWindow(QtWidgets.QMainWindow):
     
     
     def save(self):
-        # has_any_data = []
-        # for element in self.data:
-        #     frame_has_data = False
-        #     for key, value in element.items():
-        #         if len(value) > 0:
-        #             frame_has_data = True
-        #             break
-        #     has_any_data.append(frame_has_data)
-        
-        # data = {}
-        # for i, element in enumerate(self.data):
-        #     row = {}
-        #     if not has_any_data[i]:
-        #         continue
-        #     for key, value in element.items():
-        #         if value is None:
-        #             value = [np.nan, np.nan, 0]
-        #         row[key + '_x'] = value[0]
-        #         row[key + '_y'] = value[1]
-        #         row[key + '_p'] = 1
-        #     data[i] = row
-            
-        # df = pd.DataFrame(data)
-        # # switch rows and columns
-        # df = df.T
-        df = utils.convert_data_to_df(self.data)
+        # add image names to data
+        image_names = None
+        if self.cfg.save_image_names:
+            image_names = self.player.videoView.get_image_names()
+
+        df = utils.convert_data_to_df(self.data, image_names=image_names)
         df.to_csv(self.save_filename)
         print('saving to {}'.format(self.save_filename))
         self.saved = True
@@ -256,6 +239,8 @@ class MainWindow(QtWidgets.QMainWindow):
         assert os.path.isfile(filename)
         print('loading from {}'.format(filename))
         df = pd.read_csv(filename, index_col=0)
+        if 'image_name' in df: del df['image_name']
+
         # data is initialized when we load our video
         data = utils.convert_df_to_data(df, len(self.data), self.keypoint_dict)
         df.head()
