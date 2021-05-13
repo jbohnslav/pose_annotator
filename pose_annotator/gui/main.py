@@ -22,43 +22,46 @@ video_endings = ['.mov', '.mp4', '.avi']
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, cfg: DictConfig):
         super().__init__()
-        
+
         self.cfg = cfg
-        
+
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.setWindowTitle('Pose Annotator')
-        
+
         self.player = self.ui.widget
         self.player.videoView.resize_on_each_frame = self.cfg.resize_on_each_frame
         # for convenience
         self.scene = self.player.scene
-         
+
         keys = OmegaConf.to_container(cfg.keypoints)
         self.keypoint_dict = OrderedDict({key: [] for key in keys})
         # self.keypoint_dict = {key: [] for key in keys}
         self.keypoints = None
-        
-        self.keypoints = KeypointGroup(self.keypoint_dict, self.player.videoView.scene, parent=self.player, 
-                                       colormap=self.cfg.viz.colormap, radius=self.cfg.viz.radius,
+
+        self.keypoints = KeypointGroup(self.keypoint_dict,
+                                       self.player.videoView.scene,
+                                       parent=self.player,
+                                       colormap=self.cfg.viz.colormap,
+                                       radius=self.cfg.viz.radius,
                                        click_type_to_add_keypoint=self.cfg.click_type_to_add_keypoint)
-        
+
         self.keypoint_selector = KeypointButtons(keys, colormap=cfg.viz.colormap, parent=self)
         self.ui.verticalLayout_2.addWidget(self.keypoint_selector)
-        
+
         # should do this somewhere else
         self.ui.keypoints_box.setStyleSheet('QGroupBox {background-color: rgb(80,80,80)}'
                                             'QGroupBox::title {background: transparent}')
         self.ui.toolbox.setStyleSheet('QGroupBox {background-color: rgb(80,80,80)}'
-                                            'QGroupBox::title {background: transparent}')
+                                      'QGroupBox::title {background: transparent}')
         # self.ui.keypoints_box.title().setStyleSheet('background: transparent')
-        
+
         # connect signals and slots
         self.scene.click.connect(self.keypoints.receive_click)
         self.scene.move.connect(self.keypoints.receive_move)
         self.scene.release.connect(self.keypoints.receive_release)
         self.keypoints.data.connect(self.update_data_buffer)
-        
+
         # these link the keypoint click area with the toolbar on the left
         self.keypoint_selector.selected.connect(self.keypoints.set_selected)
         self.keypoints.selected.connect(self.keypoint_selector.set_selected)
@@ -87,7 +90,7 @@ class MainWindow(QtWidgets.QMainWindow):
         delete_shortcut.activated.connect(self.keypoints.clear_selected)
         backspace_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('Backspace'), self)
         backspace_shortcut.activated.connect(self.keypoints.clear_selected)
-        
+
         self.data = []
         self.saved = True
         self.framenum = 0
@@ -106,22 +109,21 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 raise ValueError('filetype of input not known: {}'.format(cfg.path))
             self.initialize_new_file(cfg.path, filetype)
-        
+
         self.show()
-        
+
     def get_save_loc(self):
         saveloc = self.cfg.save_loc
         if saveloc is not None:
             assert os.path.isdir(saveloc)
         return saveloc
-        
+
     def open_file_browser(self, filestring, prompt, filetype):
         options = QtWidgets.QFileDialog.Options()
         # filestring = 'VideoReader files (*.h5 *.avi *.mp4 *.png *.jpg *.mov)'
         # prompt = "Click on video to open. If a directory full of images, click any image"
         if filetype == 'file':
-            filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, prompt, '',
-                                                    filestring, options=options)
+            filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, prompt, '', filestring, options=options)
             if not os.path.isfile(filename):
                 raise ValueError('file does not exist: {}'.format(filename))
         elif filetype == 'directory':
@@ -130,37 +132,37 @@ class MainWindow(QtWidgets.QMainWindow):
                 raise ValueError('directory does not exist: {}'.format(filename))
         else:
             raise NotImplementedError
-        
+
         return filename
-    
+
     def open_image_file(self):
         filestring = 'Image files (*.jpg *.png *.tif *.bmp)'
         prompt = 'Click an image file to open'
         filename = self.open_file_browser(filestring, prompt, 'file')
-        
+
         self.initialize_new_file(filename, 'image')
-        
+
     def open_video(self):
         filestring = 'VideoReader files (*.h5 *.avi *.mp4 *.png *.jpg *.mov)'
         prompt = 'Click a video file to open'
         filename = self.open_file_browser(filestring, prompt, 'file')
-        
+
         self.initialize_new_file(filename, 'video')
-        
+
     def open_image_directory(self):
         filestring = ''
         prompt = 'Click a directory containing image files'
         filename = self.open_file_browser(filestring, prompt, 'directory')
-        
+
         self.initialize_new_file(filename, 'video')
-        
+
     def initialize_new_file(self, filename, filetype):
         self.prompt_for_save()
-        
-        # hack for startup: we will open on frame zero, so have to have a 1-element list when initialize-image or 
+
+        # hack for startup: we will open on frame zero, so have to have a 1-element list when initialize-image or
         # initialize-video is called, because that will trigger the "update_framenum" slot
         self.data = [deepcopy(self.keypoint_dict) for i in range(1)]
-        
+
         if filetype == 'image':
             self.player.videoView.initialize_image(filename)
             N = 1
@@ -169,24 +171,21 @@ class MainWindow(QtWidgets.QMainWindow):
             N = len(self.player.videoView.vid)
         else:
             raise ValueError('unknown file type: {}'.format(filetype))
-        
+
         save_loc = self.get_save_loc()
         if save_loc is None:
             save_loc = os.path.dirname(filename)
-        
-        self.save_filename = os.path.join(save_loc, 
-                                          os.path.splitext(os.path.basename(filename))[0] + '_keypoints.csv')
+
+        self.save_filename = os.path.join(save_loc, os.path.splitext(os.path.basename(filename))[0] + '_keypoints.csv')
         self.data = [deepcopy(self.keypoint_dict) for i in range(N)]
         if os.path.isfile(self.save_filename):
             self.load(self.save_filename)
-        
-        
+
     def initialize_keypoint_group(self, keypoints: dict):
         self.clear_keypoints()
         self.keypoints.set_data(keypoints)
-        # self.keypoints = KeypointGroup(keypoints, self.player.videoView.scene, 
+        # self.keypoints = KeypointGroup(keypoints, self.player.videoView.scene,
         #                                parent=self.player, colormap=self.cfg.viz.colormap, radius=self.cfg.radius)
-        
 
     def clear_keypoints(self):
         if self.keypoints is not None:
@@ -194,24 +193,24 @@ class MainWindow(QtWidgets.QMainWindow):
             self.keypoints.clear_data()
         # else:
         #     print('not clearing')
-    
+
     @QtCore.Slot(dict)
     def update_data_buffer(self, data):
-        # without copying, could have an issue where the underlying keypoint gui state changes. we want to only 
+        # without copying, could have an issue where the underlying keypoint gui state changes. we want to only
         # keep the real data
         self.data[self.framenum] = deepcopy(data)
         self.saved = False
         if self.cfg.autosave:
             self.save()
-            
+
     @QtCore.Slot(int)
-    def update_framenum(self, framenum, force: bool=False):
+    def update_framenum(self, framenum, force: bool = False):
         if self.framenum != framenum or force:
             # convenience: rather than dig this value out of the widgets, the app will have this attribute
             self.framenum = framenum
             keypoints = self.data[framenum]
             self.initialize_keypoint_group(keypoints)
-            
+
             # radio button will be set to the first keypoint that hasn't been placed on this frame
             first_nonzero = len(keypoints) - 1
             for i, (key, value) in enumerate(keypoints.items()):
@@ -221,8 +220,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         break
 
             self.keypoint_selector.set_selected(first_nonzero)
-    
-    
+
     def save(self):
         # add image names to data
         image_names = None
@@ -234,7 +232,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print('saving to {}'.format(self.save_filename))
         self.saved = True
         return df
-    
+
     def load(self, filename):
         assert os.path.isfile(filename)
         print('loading from {}'.format(filename))
@@ -247,13 +245,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.data = data
         # do this to re-load the zeroth frame with data
         self.update_framenum(0, force=True)
-            
+
     def prompt_for_save(self):
         if self.saved:
             return
         if simple_popup_question(self, 'You have unsaved changes. Do you want to save?'):
             self.save()
-            
+
     def closeEvent(self, event, *args, **kwargs):
         super().closeEvent(event, *args, **kwargs)
         # https://stackoverflow.com/questions/1414781/prompt-on-exit-in-pyqt-application
@@ -261,9 +259,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if hasattr(self.player.videoView, 'vid'):
             self.player.videoView.vid.close()
-        
-        
-            
+
+
 def set_style(app):
     # https://www.wenzhaodesign.com/devblog/python-pyside2-simple-dark-theme
     # button from here https://github.com/persepolisdm/persepolis/blob/master/persepolis/gui/palettes.py
@@ -280,23 +277,22 @@ def set_style(app):
     darktheme.setColor(QtGui.QPalette.Highlight, QtGui.QColor(45, 45, 45))
     darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.Light, QtGui.QColor(60, 60, 60))
     darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.Shadow, QtGui.QColor(50, 50, 50))
-    darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.ButtonText,
-                       QtGui.QColor(111, 111, 111))
+    darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.ButtonText, QtGui.QColor(111, 111, 111))
     darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.Text, QtGui.QColor(122, 118, 113))
-    darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText,
-                       QtGui.QColor(122, 118, 113))
+    darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText, QtGui.QColor(122, 118, 113))
     darktheme.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.Base, QtGui.QColor(32, 32, 32))
     app.setPalette(darktheme)
     return app
 
+
 def run():
     app = QtWidgets.QApplication(sys.argv)
     app = set_style(app)
-    
+
     default_path = os.path.join(os.path.dirname(__file__), 'default_config.yaml')
-    
+
     default = OmegaConf.load(default_path)
-    
+
     cli = OmegaConf.from_cli()
     if cli.user_cfg is not None:
         assert os.path.isfile(cli.user_cfg)
@@ -304,7 +300,7 @@ def run():
         cfg = OmegaConf.merge(default, user_cfg, cli)
     else:
         cfg = OmegaConf.merge(default, cli)
-    
+
     OmegaConf.set_struct(cfg, True)
 
     window = MainWindow(cfg)
@@ -313,8 +309,8 @@ def run():
 
     sys.exit(app.exec_())
 
+
 if __name__ == '__main__':
     # log.info('CWD: {}'.format(os.getcwd()))
     # log.info('Configuration used: {}'.format(cfg.pretty()))
     run()
-    
