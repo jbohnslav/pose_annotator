@@ -29,3 +29,6 @@ Customize [default_config.yaml](pose_annotator/gui/default_config.yaml) then lau
 ## TODO
 * Make player resize image appropriately on startup
   * current behavior: changing frame resizes images to fit in view; does not expand size on image resize
+* support removing keypoints
+* support multiple animals / people per image
+* add action queue + undo button
